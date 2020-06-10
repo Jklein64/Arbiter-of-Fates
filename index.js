@@ -1,16 +1,15 @@
 const Discord = require("discord.js")
 const client = new Discord.Client()
 require('dotenv').config()
-const prefix = "roll"
 
 
 client.on("ready", () => console.log(`logged in as ${client.user.tag}!`))
 
 client.on("message", message => {
   let text = message.content
-  regex = new RegExp(`^${prefix}\\s.*`, "i") // starts with "roll " and is followed by something
+  regex = new RegExp(`^${process.env.PREFIX}\\s.*`, "i") // starts with "roll " and is followed by something
   if (regex.test(text)) {
-    regex = new RegExp(`^${prefix}\\s`, "i") // the "roll " part of the message
+    regex = new RegExp(`^${process.env.PREFIX}\\s`, "i") // the "roll " part of the message
     let command = text.replace(regex, "").trim()
     if (/help/i.test(command)) // contains the word "help", case insensitive
       handleHelp(message)
