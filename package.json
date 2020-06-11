@@ -10,10 +10,14 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node .",
+    "start": "node index.js",
     "test": "nodemon --inspect index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "engines": {
+    "node": "12.13.0",
+    "npm": "*"
+  }
 }
