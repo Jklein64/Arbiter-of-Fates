@@ -1,6 +1,8 @@
 require('dotenv').config()
 const Discord = require("discord.js")
 const client = new Discord.Client()
+const Random = require("random-js").Random;
+const random = new Random();
 
 
 client.on("ready", () => console.log(`logged in as ${client.user.tag}!`))
@@ -80,8 +82,6 @@ class Die {
   }
 
   roll(advantage, disadvantage) {
-    const Random = require("random-js").Random;
-    const random = new Random();
     let numRolls = advantage ^ disadvantage ? this.quantity * 2 : this.quantity; // XOR since adv and disadv cancel
     let totalReducer = (total, current) => total + current // sum all rolls
     let rollReducer = (string, value) => string += `${value} + ` // format rolls to look like sum
