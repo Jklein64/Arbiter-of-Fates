@@ -5,14 +5,6 @@ const client = new Client()
 
 client.on("ready", () => {
     console.log(`logged in as ${client.user?.tag}!`)
-    // let dice: Dice[] = []
-    // let counts: number[] = [0, 0, 0, 0, 0, 0, 0, 0]
-    // let count: number = 10000
-    // for (let i = 0; i < count; i++)
-    //     dice.push(new Dice(8))
-    // let output: number[] = dice.map(die => die.run())
-    // output.forEach(num => counts[num - 1]++);
-    // console.log(counts.map(number => number / count))
 })
 
 
@@ -27,44 +19,82 @@ client.on("message", (message: Message) => {
 
         // get the part after the prefix
         let text: string | undefined = message.content.match(/(?<=roll\s).*/i)?.toString()
-        let diceReducer: ((output: string, current: number | number[]) => string) | null = null
+        let joiner: string = ""
+        let diceReducer: ((output: string, current: number[]) => string) | null = null
+        let format: ((rolls: number[][], modifier: Modifier | null) => string) | null = null
 
         // if is valid input (with or without a mode), process it
         if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]+d[4,6,8,10,12,20])+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
+            enum Command {
+                Sum = "SUM",
+                Advantage = "ADV",
+                Disadvantage = "DISADV",
+                List = "LIST"
+            }
 
             // get the mode
-            let mode: string | undefined = text.match(/^[a-z]+/i)?.toString()
-            console.log("mode", mode)
+            let command: Command | string | undefined = text.match(/^[a-z]+/i)?.toString()
+            if (command && /^(sum|add|total)$/i.test(command))
+                command = Command.Sum
+            else if (command && /^(adv(antage)?).*/i.test(command))
+                command = Command.Advantage
+            else if (command && /^(disadv(antage)?).*/i.test(command))
+                command = Command.Disadvantage
+            else if (command === undefined)
+                command = Command.List
+            console.log("mode", command)
 
-            // if the mode is a known mode, define its formatter
-            if (mode === undefined || /^((\"\")|sum|add|total|(adv|disadv)(antage)?)$/i.test(mode))
+            // mode is sum/add/total
+            if (command === Command.Sum) {
+                // diceReducer = (output: string, current: number[]): string => `${output} + [${current}]`
+                joiner = " + "
+                format = (rolls: number[][], modifier: Modifier | null): string => {
+                    let total: number = modifier ? parseInt(modifier.value) : 0
+                    rolls.forEach(roll => total += roll[0])
+                    return `**${total}**`
+                }
+            }
 
-                // mode is sum/add/total
-                if (mode !== undefined && /^(sum|add|total)$/i.test(mode))
-                    diceReducer = (output: string, current: number | number[]): string => `${output} + [${current}]`
+            // mode is adv/disadv
+            else if (command === Command.Advantage || command === Command.Disadvantage) {
+                // diceReducer = (output: string, current: number[]): string => `${output} or [${current}]`
+                joiner = " or "
+                format = (rolls: number[][], modifier: Modifier | null): string => {
+                    let output: string[] = []
+                    for (const roll of rolls)
+                        if (command !== undefined && /^(adv(antage)?).*/i.test(command))
+                            output.push(`[${roll.reduce((max, curr) => Math.max(max, curr), -Infinity) + (modifier ? parseInt(modifier.value) : 0)}]`)
+                        else if (command !== undefined && /^(disadv(antage)?).*/i.test(command))
+                            output.push(`[${roll.reduce((min, curr) => Math.min(min, curr), Infinity) + (modifier ? parseInt(modifier.value) : 0)}]`)
+                    return `**${output.join(", ")}**`
+                }
+            }
 
-                // mode is adv/disadv
-                else if (mode !== undefined && /^((adv|disadv)(antage)?).*/i.test(mode))
-                    diceReducer = (output: string, current: number | number[]): string => `${output} or [${current}]`
-
-                // mode is undefined (implicitly, it is list)
-                else
-                    diceReducer = (output: string, current: number | number[]): string => `${output}, [${current}]`
-
+            // mode is undefined (implicitly, it is list)
+            else if (command === Command.List) {
+                // diceReducer = (output: string, current: number[]): string => `${output}, [${current}]`
+                joiner = ", "
+                format = (rolls: number[][], modifier: Modifier | null): string => {
+                    let output: string[][] = []
+                    for (const roll of rolls)
+                        output.push(roll.map(number => `[${number + (modifier ? parseInt(modifier.value) : 0)}]`))
+                    return `**${output.join(", ")}**`
+                }
+            }
 
             // if unknown mode is specified, reply with error
             else {
-                message.reply(`Error: ${mode} is not a valid mode`)
+                message.reply(`Error: ${command} is not a valid mode`)
                 return
             }
 
             // get each die or number individually -> inputs: string[]
             let inputs: string[] = text.split(" ").map(word => word.replace(",", "").trim())
-            let output: { dice: (number | number[])[], modifier: string } = { dice: [], modifier: "" }
-            let modifier: Modifier
-            let rolls: (Dice | Dice[])[] = []
+            let output: { dice: number[][], modifier: string } = { dice: [], modifier: "" }
+            let rolls: Dice[][] = []
+            let modifier: Modifier | null = null
 
-            // inputs: string[] -> commands: (Dice | Modifier)[]
+            // inputs: string[] -> rolls: Dice[][]
             inputs.forEach(input => {
 
                 // input is Dice
@@ -77,12 +107,12 @@ client.on("message", (message: Message) => {
                         for (let i = 0; i < parseInt(quantity); i++) {
 
                             // if mode is adv/advantage or disadv/disadvantage, roll twice
-                            if (mode !== undefined && /^((adv|disadv)(antage)?).*/i.test(mode))
+                            if (command !== undefined && /^((adv|disadv)(antage)?).*/i.test(command))
                                 rolls.push([new Dice(parseInt(type)), new Dice(parseInt(type))])
 
                             // else roll once
                             else
-                                rolls.push(new Dice(parseInt(type)))
+                                rolls.push([new Dice(parseInt(type))])
                         }
                 }
 
@@ -92,26 +122,28 @@ client.on("message", (message: Message) => {
                     if (regex !== null) {
                         let sign: string = regex[1]
                         let value: number = parseInt(regex[0])
-                        modifier = new Modifier((sign === "-" ? -1 : 1) * value + parseInt(modifier?.value))
-                        // let modifier: { sign: string, value: number } = { sign: regex[1], value: parseInt(regex[0]) }
-                        // // let sign: string | undefined = input.match(/^(\+|-)/)?.toString()
-
-                        // console.log(modifier)
-                        // console.log(input.match(/^(\+|-)/))
-                        // console.log(sign)
-                        // modifiers.push(new Modifier((sign === "-" ? -1 : 1) * value))
+                        if (modifier)
+                            modifier = new Modifier((sign === "-" ? -1 : 1) * value + parseInt(modifier.value))
+                        else
+                            modifier = new Modifier((sign === "-" ? -1 : 1) * value)
+                        output.modifier = modifier.value
                     }
                 }
             })
 
-            // rolls: (Dice | Dice[])[] -> output: (number | number[])[]
-            output.dice = rolls.map(roll => roll instanceof Dice ? roll.evaluate() : roll.map(die => die.evaluate()))
-            // output.modifiers = modifiers.map(modifier => modifier.value)
-            let reply: string | undefined = `${output.dice.reduce(diceReducer, "")} ${output.modifier}`
-            console.log(reply)
-            reply = reply.match(/(?<=\,\s).*/)?.toString()
+            // rolls: Dice[][] -> output: number[][]
+            output.dice = rolls.map(roll => roll.map(die => die.evaluate()))
+            let reply: string | string[][] = []
+            for (const roll of output.dice)
+                reply.push(roll.map(number => `[${number + (modifier ? parseInt(modifier.value) : 0)}]`))
+            reply = `${reply.join(joiner)}`
+
+            if (format)
+                reply += ` = ${format(output.dice, modifier)}`
             message.reply(reply)
-            console.log(output)
+            if (format !== null && modifier !== undefined) {
+                console.log(format(output.dice, modifier))
+            }
 
         } else {
             message.reply("That isn't a valid input ya doof")
