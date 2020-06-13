@@ -1,5 +1,6 @@
 require("dotenv").config()
 import { Client, Message } from "discord.js"
+import { parse } from "path"
 const client = new Client()
 
 
@@ -18,76 +19,107 @@ client.on("ready", () => {
 
 client.on("message", (message: Message) => {
 
+    // dont' do anything in response to own messages
+    if (message.author.username === "Arbiter of Fates")
+        return
+
     // if the message matches the roll prefix
     if (/^roll\s.+/i.test(message.content)) {
 
         // get the part after the prefix
         let text: string | undefined = message.content.match(/(?<=roll\s).*/i)?.toString()
-        let formatter: ((output: string, current: number) => string) | null = null
+        let diceReducer: ((output: string, current: Dice) => string) | null = null
 
         // if is valid input (with or without a mode), process it
-        if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]*d[4,6,8,10,12,20])+/i.test(message.content)) {
+        if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]+d[4,6,8,10,12,20])+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
 
             // get the mode
             let mode: string | undefined = text.match(/^[a-z]+/i)?.toString()
             console.log("mode", mode)
 
-            // if the mode is a known mode, process it
+            // if the mode is a known mode, define its formatter
             if (mode === undefined || /^((\"\")|sum|add|total|(adv|disadv)(antage)?)$/i.test(mode))
 
                 // mode is sum/add/total
                 if (mode !== undefined && /^(sum|add|total)$/i.test(mode))
-                    formatter = (output: string, current: number): string => `${output} + [${current}]`
+                    diceReducer = (output: string, current: Dice): string => `${output} + [${current.evaluate()}]`
 
                 // mode is adv/disadv
                 else if (mode !== undefined && /^((adv|disadv)(antage)?).*/i.test(mode))
-                    formatter = (output: string, current: number): string => `${output} or [${current}]`
+                    diceReducer = (output: string, current: Dice): string => `${output} or [${current.evaluate()}]`
 
-                // mode is undefined (implicitly list)
+                // mode is undefined (implicitly, it is list)
                 else
-                    formatter = (output: string, current: number): string => `${output}, [${current}]`
+                    diceReducer = (output: string, current: Dice): string => `${output}, [${current.evaluate()}]`
 
 
-            // if no mode is specified or isn't recognized, reply with error
+            // if unknown mode is specified, reply with error
             else {
-                message.reply(`Error: ${mode} is not a mode`)
+                message.reply(`Error: ${mode} is not a valid mode`)
                 return
             }
 
-
             // get each die or number individually -> inputs: string[]
             let inputs: string[] = text.split(" ").map(word => word.replace(",", "").trim())
-            let commands: (Dice | Modifier)[] = []
-            let output: number[] = []
+            let output: { dice: (number | number[])[], modifiers: string[] } = { dice: [], modifiers: [] }
+            let modifiers: Modifier[] = []
+            let rolls: (Dice | Dice[])[] = []
 
             // inputs: string[] -> commands: (Dice | Modifier)[]
             inputs.forEach(input => {
 
-                // input is Modifier
-                if (/\+[0-9]+/.test(input)) {
-                    let modifier: string | undefined = input.match(/(?<=\+)[0-9]+/)?.toString()
-                    if (modifier != undefined)
-                        commands.push(new Modifier(parseInt(modifier)))
-                }
-
                 // input is Dice
-                else if (/[0-9]+d[4,6,8,10,12,20]/i.test(input)) {
+                if (/[0-9]+d[4,6,8,10,12,20]/i.test(input)) {
                     let quantity: string | undefined = input.match(/^[0-9]+/)?.toString()
                     let type: string | undefined = input.match(/[0-9]+$/)?.toString()
+
+                    // add quantity d type dice to be rolled
                     if (quantity != undefined && type != undefined)
-                        for (let i = 0; i < parseInt(quantity); i++)
-                            commands.push(new Dice(parseInt(type)))
+                        for (let i = 0; i < parseInt(quantity); i++) {
+
+                            // if mode is adv/advantage or disadv/disadvantage, roll twice
+                            if (mode !== undefined && /^((adv|disadv)(antage)?).*/i.test(mode))
+                                rolls.push([new Dice(parseInt(type)), new Dice(parseInt(type))])
+
+                            // else roll once
+                            else
+                                rolls.push(new Dice(parseInt(type)))
+                        }
+                }
+
+                // input is Modifier
+                else if (/^(\+|\-)[0-9]+/.test(input)) {
+                    let regex: RegExpMatchArray | null = input.match(/(?<=(\+|\-))[0-9]+/)
+                    if (regex !== null) {
+                        let sign: string = regex[1]
+                        let value: number = parseInt(regex[0])
+                        let modifier: { sign: string, value: number } = { sign: regex[1], value: parseInt(regex[0]) }
+                        // let sign: string | undefined = input.match(/^(\+|-)/)?.toString()
+
+                        console.log(modifier)
+                        console.log(input.match(/^(\+|-)/))
+                        console.log(sign)
+                        modifiers.push(new Modifier((sign === "-" ? -1 : 1) * value))
+                    }
                 }
             })
 
             // commands: (Dice | Modifier)[] -> output: number[]
-            output = commands.map(command => command.evaluate())
-            console.log(output.reduce(formatter, ""))
-        }
+            output.dice = rolls.map(roll => {
+                if (roll instanceof Dice)
+                    return roll.evaluate()
+                else
+                    return roll.map(die => die.evaluate())
+            })
+            output.modifiers = modifiers.map(modifier => modifier.value)
 
-    } else {
-        message.reply("That isn't a valid input")
-        return
+            console.log(output)
+
+            // console.log(commands.reduce(formatter, ""))
+        } else {
+            message.reply("That isn't a valid input")
+            return
+        }
     }
 })
 
@@ -113,13 +145,16 @@ class Dice {
 
 
 class Modifier {
-    private value: number
+    public value: string
 
     constructor(value: number) {
-        this.value = value
+        if (value > 0)
+            this.value = `+${value}`
+        else
+            this.value = `${value}`
     }
 
-    evaluate(): number {
-        return this.value
-    }
+    // evaluate(): number {
+    //     return this.value
+    // }
 }
