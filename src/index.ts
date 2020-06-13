@@ -1,6 +1,5 @@
 require("dotenv").config()
 import { Client, Message } from "discord.js"
-import { parse } from "path"
 const client = new Client()
 
 
