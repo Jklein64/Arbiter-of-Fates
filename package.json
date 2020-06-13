@@ -1,23 +1,35 @@
 {
   "name": "arbiter-of-fates",
   "version": "1.0.0",
-  "description": "a bot for a friend",
+  "description": "",
   "main": "index.js",
-  "dependencies": {
-    "discord.js": "^12.2.0",
-    "dotenv": "^8.2.0",
-    "random-js": "^2.1.0"
-  },
-  "devDependencies": {},
   "scripts": {
-    "start": "node index.js",
-    "test": "nodemon --inspect index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jklein64/Arbiter-of-Fates.git"
+  },
   "author": "",
   "license": "ISC",
-  "engines": {
-    "node": "12.13.0",
-    "npm": "*"
+  "bugs": {
+    "url": "https://github.com/Jklein64/Arbiter-of-Fates/issues"
+  },
+  "homepage": "https://github.com/Jklein64/Arbiter-of-Fates#readme",
+  "dependencies": {
+    "@types/node": "^14.0.13",
+    "discord.js": "^12.2.0",
+    "dotenv": "^8.2.0",
+    "inversify": "^5.0.1",
+    "reflect-metadata": "^0.1.13",
+    "typescript": "^3.9.5"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.11",
+    "@types/mocha": "^7.0.2",
+    "chai": "^4.2.0",
+    "mocha": "^8.0.1",
+    "ts-mockito": "^2.6.1",
+    "ts-node": "^8.10.2"
   }
 }
