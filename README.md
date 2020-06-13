@@ -13,6 +13,6 @@ Either download this repository as a `.zip` file or clone it by running `git clo
 
 ## Running
 
-`npm install` Install dependencies  
-`npm start` Run the bot locally (on your computer)  
-`npm test` Test the bot locally (with live refresh)
+Navigate into the directory and run:
+1. `npm install` Install dependencies  
+2. `npm run dev` Run the bot locally (on your computer)  

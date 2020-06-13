@@ -1,23 +1,33 @@
 {
   "name": "arbiter-of-fates",
   "version": "1.0.0",
-  "description": "a bot for a friend",
+  "description": "",
   "main": "index.js",
-  "dependencies": {
-    "discord.js": "^12.2.0",
-    "dotenv": "^8.2.0",
-    "random-js": "^2.1.0"
-  },
-  "devDependencies": {},
   "scripts": {
-    "start": "node index.js",
-    "test": "nodemon --inspect index.js"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "concurrently \"tsc -w\" \"nodemon dist/index.js --inspect\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jklein64/Arbiter-of-Fates.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "engines": {
-    "node": "12.13.0",
-    "npm": "*"
+  "bugs": {
+    "url": "https://github.com/Jklein64/Arbiter-of-Fates/issues"
+  },
+  "homepage": "https://github.com/Jklein64/Arbiter-of-Fates#readme",
+  "devDependencies": {
+    "nodemon": "^2.0.4",
+    "typescript": "^3.9.5"
+  },
+  "dependencies": {
+    "@types/node": "^14.0.13",
+    "@types/ws": "^7.2.5",
+    "concurrently": "^5.2.0",
+    "discord.js": "^12.2.0",
+    "dotenv": "^8.2.0"
   }
 }
