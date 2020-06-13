@@ -16,7 +16,7 @@ client.on("ready", () => {
     // console.log(counts.map(number => number / count))
 });
 client.on("message", (message) => {
-    var _a, _b;
+    var _a, _b, _c;
     // dont' do anything in response to own messages
     if (message.author.username === "Arbiter of Fates")
         return;
@@ -34,13 +34,13 @@ client.on("message", (message) => {
             if (mode === undefined || /^((\"\")|sum|add|total|(adv|disadv)(antage)?)$/i.test(mode))
                 // mode is sum/add/total
                 if (mode !== undefined && /^(sum|add|total)$/i.test(mode))
-                    diceReducer = (output, current) => `${output} + [${current.evaluate()}]`;
+                    diceReducer = (output, current) => `${output} + [${current}]`;
                 // mode is adv/disadv
                 else if (mode !== undefined && /^((adv|disadv)(antage)?).*/i.test(mode))
-                    diceReducer = (output, current) => `${output} or [${current.evaluate()}]`;
+                    diceReducer = (output, current) => `${output} or [${current}]`;
                 // mode is undefined (implicitly, it is list)
                 else
-                    diceReducer = (output, current) => `${output}, [${current.evaluate()}]`;
+                    diceReducer = (output, current) => `${output}, [${current}]`;
             // if unknown mode is specified, reply with error
             else {
                 message.reply(`Error: ${mode} is not a valid mode`);
@@ -48,8 +48,8 @@ client.on("message", (message) => {
             }
             // get each die or number individually -> inputs: string[]
             let inputs = text.split(" ").map(word => word.replace(",", "").trim());
-            let output = { dice: [], modifiers: [] };
-            let modifiers = [];
+            let output = { dice: [], modifier: "" };
+            let modifier;
             let rolls = [];
             // inputs: string[] -> commands: (Dice | Modifier)[]
             inputs.forEach(input => {
@@ -75,28 +75,27 @@ client.on("message", (message) => {
                     if (regex !== null) {
                         let sign = regex[1];
                         let value = parseInt(regex[0]);
-                        let modifier = { sign: regex[1], value: parseInt(regex[0]) };
-                        // let sign: string | undefined = input.match(/^(\+|-)/)?.toString()
-                        console.log(modifier);
-                        console.log(input.match(/^(\+|-)/));
-                        console.log(sign);
-                        modifiers.push(new Modifier((sign === "-" ? -1 : 1) * value));
+                        modifier = new Modifier((sign === "-" ? -1 : 1) * value + parseInt(modifier === null || modifier === void 0 ? void 0 : modifier.value));
+                        // let modifier: { sign: string, value: number } = { sign: regex[1], value: parseInt(regex[0]) }
+                        // // let sign: string | undefined = input.match(/^(\+|-)/)?.toString()
+                        // console.log(modifier)
+                        // console.log(input.match(/^(\+|-)/))
+                        // console.log(sign)
+                        // modifiers.push(new Modifier((sign === "-" ? -1 : 1) * value))
                     }
                 }
             });
-            // commands: (Dice | Modifier)[] -> output: number[]
-            output.dice = rolls.map(roll => {
-                if (roll instanceof Dice)
-                    return roll.evaluate();
-                else
-                    return roll.map(die => die.evaluate());
-            });
-            output.modifiers = modifiers.map(modifier => modifier.value);
+            // rolls: (Dice | Dice[])[] -> output: (number | number[])[]
+            output.dice = rolls.map(roll => roll instanceof Dice ? roll.evaluate() : roll.map(die => die.evaluate()));
+            // output.modifiers = modifiers.map(modifier => modifier.value)
+            let reply = `${output.dice.reduce(diceReducer, "")} ${output.modifier}`;
+            console.log(reply);
+            reply = (_c = reply.match(/(?<=\,\s).*/)) === null || _c === void 0 ? void 0 : _c.toString();
+            message.reply(reply);
             console.log(output);
-            // console.log(commands.reduce(formatter, ""))
         }
         else {
-            message.reply("That isn't a valid input");
+            message.reply("That isn't a valid input ya doof");
             return;
         }
     }
