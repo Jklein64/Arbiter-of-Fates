@@ -19,8 +19,6 @@ client.on("message", (message: Message) => {
 
         // get the part after the prefix
         let text: string | undefined = message.content.match(/(?<=roll\s).*/i)?.toString()
-        // let format: ((rolls: number[][], modifier: Modifier | null) => string) | null = null
-        // let joiner: string = ""
 
         // is valid input (with or without a Command), process it
         if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]+d[4,6,8,10,12,20])+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
@@ -55,88 +53,54 @@ client.on("message", (message: Message) => {
                 return
             }
 
-            console.log("mode", command)
-
-            // // mode is Sum/Add/Total
-            // if (command === Command.Sum) {
-            //     joiner = " + "
-            //     format = (rolls: number[][], modifier: Modifier | null): string => {
-            //         let total: number = modifier ? modifier.value : 0
-            //         rolls.forEach(roll => total += roll[0])
-            //         return `**${total}**`
-            //     }
-            // }
-
-            // // mode is Advantage or Disadvantage
-            // else if (command === Command.Advantage || command === Command.Disadvantage) {
-            //     joiner = " or "
-            //     format = (rolls: number[][], modifier: Modifier | null): string => {
-            //         let output: string[] = []
-            //         for (const roll of rolls)
-            //             if (command !== undefined && /^(adv(antage)?).*/i.test(command))
-            //                 output.push(`[${roll.reduce((max, curr) => Math.max(max, curr), -Infinity) + (modifier !== null ? modifier.value : 0)}]`)
-            //             else if (command !== undefined && /^(disadv(antage)?).*/i.test(command))
-            //                 output.push(`[${roll.reduce((min, curr) => Math.min(min, curr), Infinity) + (modifier !== null ? modifier.value : 0)}]`)
-            //         return `**${output.join(", ")}**`
-            //     }
-            // }
-
-            // // mode is List
-            // else if (command === Command.List) {
-            //     joiner = ", "
-            //     format = (rolls: number[][], modifier: Modifier | null): string => {
-            //         let output: string[][] = []
-            //         for (const roll of rolls)
-            //             output.push(roll.map(number => `[${number + (modifier ? modifier.value : 0)}]`))
-            //         return `**${output.join(", ")}**`
-            //     }
-            // }
-
-            // if unknown mode is specified, reply with error
-            // else {
-            //     message.reply(`Error: ${command} is not a valid mode`)
-            //     return
-            // }
-
             // get each die or number individually -> inputs: string[]
-            // let inputs: string[] = text.split(" ").map(word => word.replace(",", "").trim())
             let inputs: RegExpMatchArray | null = text.match(/([0-9]+d[4,6,8,10,12,20])|((\+|\-)\s?[0-9]+)/gi)
             console.log("inputs", inputs)
-            // let output: { dice: number[][], modifier: Modifier | null } = { dice: [], modifier: null }
             let modifier: Modifier = new Modifier(0)
             let rolls: Dice[][] = []
 
-            // inputs: string[] -> rolls: Dice[][]
-            inputs.forEach(input => {
+            // inputs are valid
+            if (inputs)
 
-                // input is Dice
-                if (/[0-9]+d[4,6,8,10,12,20]/gi.test(input)) {
-                    let quantity: string | undefined = input.match(/^[0-9]+/)?.toString()
-                    let type: string | undefined = input.match(/[0-9]+$/)?.toString()
-                    let multiplier: number = command === Command.Advantage || command === Command.Disadvantage ? 2 : 1
+                // inputs: string[] -> rolls: Dice[][]
+                inputs.forEach(input => {
 
-                    // add quantity d type dice to be rolled
-                    if (quantity && type)
-                        for (let i = 0; i < multiplier; i++) {
-                            let dice = Array<Dice>(parseInt(quantity))
+                    // input is Dice
+                    if (/[0-9]+d[4,6,8,10,12,20]/gi.test(input)) {
+                        let quantity: string | undefined = input.match(/^[0-9]+/)?.toString()
+                        let type: string | undefined = input.match(/[0-9]+$/)?.toString()
+                        let dice: Dice[]
+
+                        // add quantity d type dice to be rolled
+                        if (quantity && type) {
+                            if (command === Command.Advantage || command === Command.Disadvantage)
+                                dice = Array<Dice>(parseInt(quantity) * 2)
+                            else
+                                dice = Array<Dice>(parseInt(quantity))
                             rolls.push(dice.fill(new Dice(parseInt(type))))
                         }
-                }
-
-                // input is Modifier
-                else if (/^(\+|\-)\s?[0-9]+/g.test(input)) {
-                    let regex: RegExpMatchArray | null = input.match(/(\+|\-)|[0-9]+/g)
-                    if (regex) {
-                        console.log(regex)
-                        let sign: number = parseInt(`${regex[0]}1`)
-                        let value: number = parseInt(regex[1])
-                        let prev: number = modifier.value
-
-                        // make Modifier or add on to previous
-                        modifier = new Modifier(sign * value + prev)
                     }
-                }
-            })
+
+                    // input is Modifier
+                    else if (/^(\+|\-)\s?[0-9]+/g.test(input)) {
+                        let regex: RegExpMatchArray | null = input.match(/(\+|\-)|[0-9]+/g)
+                        if (regex) {
+                            console.log(regex)
+                            let sign: number = parseInt(`${regex[0]}1`)
+                            let value: number = parseInt(regex[1])
+                            let prev: number = modifier.value
+
+                            // make Modifier or add on to previous
+                            modifier = new Modifier(sign * value + prev)
+                        }
+                    }
+                })
+
+            // inputs are invalid
+            else {
+                message.reply("Hey, no fair.  That wasn't a die, command, or modifier")
+                return
+            }
 
 
             let expression: string | string[] = []
@@ -182,19 +146,16 @@ client.on("message", (message: Message) => {
                 }
             }
 
-            // let reply: string | string[][] = []
-            // for (const rolls of output.dice)
-            //     reply.push(rolls.map(roll => `[${roll + (output.modifier ? output.modifier.value : 0)}]`))
-            // reply = `${reply.join(joiner)}`
-
+            // format expression and evaluation
             expression = expression.join(", ")
             evaluation = evaluation.join(", ")
-            // if (format)
-            //     expression += ` = ${format(output.dice, output.modifier)}`
 
+            // reply to the message
             message.reply(`${expression} = **${evaluation}**`)
+        }
 
-        } else {
+        // invalid input
+        else {
             message.reply("That isn't a valid input ya doof")
             return
         }
