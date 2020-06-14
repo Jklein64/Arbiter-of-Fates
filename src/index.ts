@@ -168,7 +168,7 @@ class Dice {
     evaluate(): number {
         let num: number = Math.random()
         for (let roll = 1; roll <= this.type; roll++)
-            if (num < (roll / this.type))
+            if (num <= (roll / this.type))
                 return roll
         return this.type
     }
