@@ -18,32 +18,32 @@ client.on("message", (message) => {
         let text = (_a = message.content.match(/(?<=roll\s).*/i)) === null || _a === void 0 ? void 0 : _a.toString();
         // is valid input (with or without a Command), process it
         if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]+d(4|6|8|10|12|20))+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
-            let Command;
-            (function (Command) {
-                Command["Sum"] = "SUM";
-                Command["Advantage"] = "ADV";
-                Command["Disadvantage"] = "DISADV";
-                Command["List"] = "LIST";
-            })(Command || (Command = {}));
+            let Cmd;
+            (function (Cmd) {
+                Cmd["Sum"] = "SUM";
+                Cmd["Advantage"] = "ADV";
+                Cmd["Disadvantage"] = "DISADV";
+                Cmd["List"] = "LIST";
+            })(Cmd || (Cmd = {}));
             // get the command type
             let command = (_b = text.match(/^[a-z]+/i)) === null || _b === void 0 ? void 0 : _b.toString();
             // command is Sum
             if (command && /^(sum|add|total)$/i.test(command))
-                command = Command.Sum;
+                command = Cmd.Sum;
             // command is Advantage
             else if (command && /^(adv(antage)?).*/i.test(command))
-                command = Command.Advantage;
+                command = Cmd.Advantage;
             // command is Disadvantage
             else if (command && /^(disadv(antage)?).*/i.test(command))
-                command = Command.Disadvantage;
+                command = Cmd.Disadvantage;
             // command is List
             else if (command === undefined)
-                command = Command.List;
+                command = Cmd.List;
             else {
                 message.reply(`Hey dumbass, ${command} doesn't exist! Just like ur brain cells xD`);
                 return;
             }
-            // get each die or number individually -> inputs: string[]
+            // get each die or number individually
             let inputs = text.match(/([0-9]+d(4|6|8|10|12|20))|((\+|\-)\s?[0-9]+)/gi);
             let modifier = new Modifier(0);
             let rolls = [];
@@ -60,9 +60,10 @@ client.on("message", (message) => {
                         // add quantity d type dice to be rolled
                         if (quantity && type) {
                             dice = Array(parseInt(quantity));
-                            if (command === Command.Advantage || command === Command.Disadvantage)
-                                rolls.push(dice.fill(new Dice(parseInt(type))));
-                            rolls.push(dice.fill(new Dice(parseInt(type))));
+                            let adv = command === Cmd.Advantage;
+                            let disadv = command === Cmd.Disadvantage;
+                            dice.fill(new Dice(parseInt(type), adv, disadv));
+                            rolls.push(dice);
                         }
                     }
                     // input is Modifier
@@ -82,42 +83,33 @@ client.on("message", (message) => {
                 message.reply("Hey, no fair.  That wasn't a die, command, or modifier");
                 return;
             }
-            let expression = [];
-            let evaluation = [];
-            // turn dice into expression and evaluation
+            let totalExpression = [];
+            let totalEvaluation = [];
             for (let roll of rolls) {
-                let output = roll.map(dice => dice.evaluate());
-                // command is Advantage or Disadvantage
-                if (command === Command.Advantage || command === Command.Disadvantage) {
-                    expression.push(`[${output.join(" or ")}]`);
-                    // command is Advantage
-                    if (command === Command.Advantage) {
-                        let max = output.reduce((max, curr) => Math.max(max, curr), -Infinity);
-                        evaluation.push(`${max + modifier.value}`);
-                    }
-                    // command is Disadvantage
-                    else if (command === Command.Disadvantage) {
-                        let min = output.reduce((min, curr) => Math.min(min, curr), Infinity);
-                        evaluation.push(`${min + modifier.value}`);
-                    }
-                }
-                // command is Sum/Add/Total
-                else if (command === Command.Sum) {
-                    expression.push(`[${output.join(" + ")}]`);
-                    let prev = evaluation[0] ? parseInt(evaluation[0]) : modifier.value;
-                    evaluation[0] = `${prev + output.reduce((total, curr) => total += curr)}`;
-                }
-                // command is List
-                else if (command === Command.List) {
-                    expression.push(`[${output.join(", ")}]`);
-                    evaluation.push(`${output.map(num => num + modifier.value).join(", ")}`);
+                for (let dice of roll) {
+                    let [expression, evaluation] = dice.data();
+                    totalExpression.push(expression.value);
+                    totalEvaluation.push(evaluation.value);
                 }
             }
-            // format expression and evaluation
-            expression = expression.join(", ");
-            evaluation = evaluation.join(", ");
-            // reply to the message
-            message.reply(`${expression} = **${evaluation}**`);
+            console.log("total Evaluation", totalEvaluation);
+            console.log("total Evaluation", totalEvaluation);
+            if (command === Cmd.Sum) {
+                totalExpression = totalExpression.join(" + ");
+                totalEvaluation = `${totalEvaluation.reduce((sum, curr) => sum += curr) + modifier.value}`;
+            }
+            else {
+                totalExpression = totalExpression.join(", ");
+                totalEvaluation = totalEvaluation.map(num => num + modifier.value);
+                totalEvaluation = totalEvaluation.join(", ");
+            }
+            console.log(command);
+            let mod = "";
+            if (modifier.value !== 0)
+                mod = ` + ${modifier.value}`;
+            let reply = `${totalExpression}${mod} = **${totalEvaluation}**`;
+            console.log(reply);
+            message.reply(reply);
         }
         // invalid input
         else {
@@ -128,15 +120,55 @@ client.on("message", (message) => {
 });
 client.login(process.env.TOKEN);
 class Dice {
-    constructor(type) {
+    constructor(type, advantage = false, disadvantage = false) {
         this.type = type;
+        this.advantage = advantage;
+        this.disadvantage = disadvantage;
     }
-    evaluate() {
+    roll() {
         let num = Math.random();
         for (let roll = 1; roll <= this.type; roll++)
-            if (num < (roll / this.type))
+            if (num <= (roll / this.type))
                 return roll;
         return this.type;
+    }
+    data() {
+        // [expression, evaluation]
+        let data = [new Expression(), new Evaluation()];
+        // advantage XOR disadvantage
+        if (this.advantage !== this.disadvantage) {
+            let output = [this.roll(), this.roll()];
+            data[0].value = `[${output.join(" or ")}]`;
+            if (this.advantage)
+                data[1].value = Math.max(...output);
+            else
+                data[1].value = Math.min(...output);
+        }
+        // only roll each die once
+        else {
+            let output = this.roll();
+            console.log(output);
+            data[0].value = `[${output}]`;
+            data[1].value = output;
+        }
+        console.log("data", data);
+        return data;
+    }
+}
+class Expression {
+    constructor(input = "") {
+        this.value = input;
+    }
+    toString() {
+        return this.value;
+    }
+}
+class Evaluation {
+    constructor(input = 0) {
+        this.value = input;
+    }
+    toString() {
+        return `${this.value}`;
     }
 }
 class Modifier {
