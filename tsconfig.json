@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "watch": true,
         "module": "commonjs",
         "outDir": "dist",
         "sourceMap": true,
