@@ -19,14 +19,16 @@ client.on("message", (message: Message) => {
 
         // get the part after the prefix
         let text: string | undefined = message.content.match(/(?<=roll\s).*/i)?.toString()
+        console.log(text)
 
         // is valid input (with or without a Command), process it
-        if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total))?\s*([0-9]+d(4|6|8|10|12|20))+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
+        if (text !== undefined && /^roll\s+(((adv|disadv)(antage)?)|(sum|add|total)|(avg|average))?\s*([0-9]+d(4|6|8|10|12|20))+(\s(\+\-)[0-9]+)?/i.test(message.content)) {
             enum Cmd {
                 Sum = "SUM",
                 Advantage = "ADV",
                 Disadvantage = "DISADV",
-                List = "LIST"
+                List = "LIST",
+                Average = "AVERAGE"
             }
 
             // get the command type
@@ -44,6 +46,10 @@ client.on("message", (message: Message) => {
             else if (command && /^(disadv(antage)?).*/i.test(command))
                 command = Cmd.Disadvantage
 
+            // command is Average
+            else if (command && /^(avg|average).*/i.test(command))
+                command = Cmd.Average
+
             // command is List
             else if (command === undefined)
                 command = Cmd.List
@@ -53,6 +59,7 @@ client.on("message", (message: Message) => {
                 return
             }
 
+            console.log(command)
             // get each die or number individually
             let inputs: RegExpMatchArray | null = text.match(/([0-9]+d(4|6|8|10|12|20))|((\+|\-)\s?[0-9]+)/gi)
             let modifier: Modifier = new Modifier(0)
@@ -117,6 +124,10 @@ client.on("message", (message: Message) => {
             if (command === Cmd.Sum) {
                 totalExpression = totalExpression.join(" + ")
                 totalEvaluation = `${totalEvaluation.reduce((sum, curr) => sum += curr) + modifier.value}`
+            } else if (command === Cmd.Average) {
+                totalExpression = `The average of ${inputs.join(", ")}`
+                const temp = totalEvaluation.map(roll => roll / (totalEvaluation as number[]).length)
+                totalEvaluation = `${temp.reduce((sum, curr) => sum + curr) + modifier.value}`
             } else {
                 totalExpression = totalExpression.join(", ")
                 totalEvaluation = totalEvaluation.map(num => num + modifier.value)
